@@ -1,4 +1,4 @@
-import { Menu, Plus, Grid3X3, Search } from "lucide-react";
+import { Menu, Plus, Grid3X3 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -52,10 +53,7 @@ export function Header({ onMenuClick, onCreateClick, onJoinClick }: HeaderProps)
           <Grid3X3 className="h-6 w-6 text-muted-foreground" />
         </button>
         
-        <Avatar className="h-8 w-8 ml-2 cursor-pointer">
-          <AvatarImage src="" />
-          <AvatarFallback className="bg-classroom-teal text-primary-foreground text-sm font-medium">U</AvatarFallback>
-        </Avatar>
+        <GoogleSignInButton />
       </div>
     </header>
   );
