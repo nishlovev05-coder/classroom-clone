@@ -9,21 +9,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface JoinClassModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onJoinClass: (code: string) => void;
+  onJoinClass: (code: string) => Promise<boolean | void> | void;
 }
 
 export function JoinClassModal({ open, onOpenChange, onJoinClass }: JoinClassModalProps) {
   const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (code.trim()) {
-      onJoinClass(code);
-      setCode("");
-      onOpenChange(false);
+      setLoading(true);
+      try {
+        await onJoinClass(code);
+        setCode("");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -49,6 +55,7 @@ export function JoinClassModal({ open, onOpenChange, onJoinClass }: JoinClassMod
               className="border border-border focus-visible:ring-1 focus-visible:ring-primary"
               placeholder=""
               maxLength={7}
+              disabled={loading}
             />
             <p className="text-xs text-muted-foreground">
               Use a class code with 5-7 letters or numbers, and no spaces or symbols
@@ -57,15 +64,22 @@ export function JoinClassModal({ open, onOpenChange, onJoinClass }: JoinClassMod
         </div>
         
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={code.length < 5}
+            disabled={code.length < 5 || loading}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Join
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Joining...
+              </>
+            ) : (
+              "Join"
+            )}
           </Button>
         </div>
       </DialogContent>

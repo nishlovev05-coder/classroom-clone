@@ -1,11 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { lovable } from "@/integrations/lovable/index";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { User } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { LogOut } from "lucide-react";
 
 export function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -31,6 +57,48 @@ export function GoogleSignInButton() {
       setIsLoading(false);
     }
   };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Signed out",
+      description: "You have been signed out successfully",
+    });
+  };
+
+  if (user) {
+    const userInitial = user.user_metadata?.full_name?.charAt(0) || 
+                       user.email?.charAt(0) || 
+                       "U";
+    const userAvatar = user.user_metadata?.avatar_url;
+    const userName = user.user_metadata?.full_name || user.email;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="gc-icon-btn p-1">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={userAvatar} alt={userName} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                {userInitial.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <div className="px-3 py-2">
+            <p className="text-sm font-medium">{userName}</p>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <Button

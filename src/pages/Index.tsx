@@ -8,58 +8,8 @@ import { ClassDetailView } from "@/components/views/ClassDetailView";
 import { CreateClassModal } from "@/components/classroom/CreateClassModal";
 import { JoinClassModal } from "@/components/classroom/JoinClassModal";
 import { cn } from "@/lib/utils";
-
-// Mock data for demonstration
-const mockClasses = [
-  {
-    id: "1",
-    name: "OOSE-3 YR (IT) 2025 T...",
-    section: "A",
-    teacher: "anitha IT",
-    color: "teal",
-    classCode: "abc123x",
-  },
-  {
-    id: "2",
-    name: "III Year 2025-2026",
-    section: "BA",
-    teacher: "Snowlin IT",
-    color: "green",
-    classCode: "def456y",
-  },
-  {
-    id: "3",
-    name: "OEE351 - RENEWABLE ...",
-    section: "IT & ECE, CSE",
-    teacher: "JEBAMANI S Mechanical",
-    color: "purple",
-    classCode: "ghi789z",
-  },
-  {
-    id: "4",
-    name: "Virtualization CCS372",
-    section: "3rd YR",
-    teacher: "Livins LV IT",
-    color: "orange",
-    classCode: "jkl012a",
-  },
-  {
-    id: "5",
-    name: "III IT- 2023-2027",
-    section: "A",
-    teacher: "PRAVEEN K V IT",
-    color: "pink",
-    classCode: "mno345b",
-  },
-  {
-    id: "6",
-    name: "3 yr-computer ne...",
-    section: "",
-    teacher: "anitha IT",
-    color: "brown",
-    classCode: "pqr678c",
-  },
-];
+import { useClasses } from "@/hooks/useClasses";
+import { useAuth } from "@/hooks/useAuth";
 
 const mockAssignments = [
   {
@@ -76,66 +26,55 @@ const mockAssignments = [
     postedDate: "Friday, 27 Sept 2024",
     type: "assignment" as const,
   },
-  {
-    id: "3",
-    title: "Lab observation",
-    className: "III YR IT",
-    postedDate: "Thursday, 17 Jul 2025",
-    type: "assignment" as const,
-  },
-  {
-    id: "4",
-    title: "CN EX-3",
-    className: "3 yr-computer network(2027 batch)",
-    postedDate: "Friday, 8 Aug 2025",
-    type: "assignment" as const,
-  },
-  {
-    id: "5",
-    title: "Quiz Cloud Security",
-    className: "III YR IT",
-    postedDate: "Monday, 12 Aug 2025",
-    type: "quiz" as const,
-  },
 ];
+
+const COLORS = ["teal", "green", "blue", "purple", "pink", "orange", "brown", "gray"];
 
 const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState("home");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
-  const [classes, setClasses] = useState(mockClasses);
+  
+  const { user } = useAuth();
+  const { classes, loading, createClass, joinClass } = useClasses();
 
-  const handleCreateClass = (data: { name: string; section: string; subject: string; room: string }) => {
-    const colors = ["teal", "green", "blue", "purple", "pink", "orange", "brown", "gray"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    const classCode = Math.random().toString(36).substring(2, 9);
-    
-    const newClass = {
-      id: Date.now().toString(),
+  const handleCreateClass = async (data: { name: string; section: string; subject: string; room: string }) => {
+    const result = await createClass({
       name: data.name,
-      section: data.section,
-      teacher: "You",
-      color: randomColor,
-      classCode,
-    };
-    
-    setClasses([newClass, ...classes]);
+      subject: data.subject || data.section || "General",
+      description: data.room ? `Room: ${data.room}` : undefined,
+    });
+    if (result) {
+      setCreateModalOpen(false);
+    }
   };
 
-  const handleJoinClass = (code: string) => {
-    console.log("Joining class with code:", code);
-    // In a real app, this would make an API call
+  const handleJoinClass = async (code: string) => {
+    const success = await joinClass(code);
+    if (success) {
+      setJoinModalOpen(false);
+    }
   };
 
   const handleClassClick = (classId: string) => {
     setCurrentView(`class-${classId}`);
   };
 
+  // Transform classes for display
+  const displayClasses = classes.map((cls, index) => ({
+    id: cls.id,
+    name: cls.name,
+    section: cls.subject,
+    teacher: cls.role === "teacher" ? "You" : cls.subject,
+    color: COLORS[index % COLORS.length],
+    classCode: cls.classCode,
+  }));
+
   const getSelectedClass = () => {
     if (currentView.startsWith("class-")) {
       const classId = currentView.replace("class-", "");
-      return classes.find((c) => c.id === classId);
+      return displayClasses.find((c) => c.id === classId);
     }
     return null;
   };
@@ -154,7 +93,7 @@ const Index = () => {
         isOpen={sidebarOpen}
         currentView={currentView}
         onViewChange={setCurrentView}
-        enrolledClasses={classes.map((c) => ({ id: c.id, name: c.name, section: c.section, color: c.color }))}
+        enrolledClasses={displayClasses.map((c) => ({ id: c.id, name: c.name, section: c.section, color: c.color }))}
       />
       
       <main
@@ -164,7 +103,12 @@ const Index = () => {
         )}
       >
         {currentView === "home" && (
-          <HomeView classes={classes} onClassClick={handleClassClick} />
+          <HomeView 
+            classes={displayClasses} 
+            onClassClick={handleClassClick}
+            loading={loading}
+            isSignedIn={!!user}
+          />
         )}
         
         {currentView === "todo" && (

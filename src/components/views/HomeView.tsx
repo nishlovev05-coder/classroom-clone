@@ -1,6 +1,9 @@
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { ClassCard } from "@/components/classroom/ClassCard";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Class {
   id: string;
@@ -13,10 +16,57 @@ interface Class {
 interface HomeViewProps {
   classes: Class[];
   onClassClick: (classId: string) => void;
+  loading?: boolean;
+  isSignedIn?: boolean;
 }
 
-export function HomeView({ classes, onClassClick }: HomeViewProps) {
+export function HomeView({ classes, onClassClick, loading = false, isSignedIn = false }: HomeViewProps) {
   const [showBanner, setShowBanner] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+
+  const handleSeedData = async () => {
+    setSeeding(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in first");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/seed-test-data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(result.message);
+        window.location.reload();
+      } else {
+        toast.error(result.error || "Failed to seed data");
+      }
+    } catch (error) {
+      console.error("Error seeding data:", error);
+      toast.error("Failed to seed test data");
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -79,11 +129,30 @@ export function HomeView({ classes, onClassClick }: HomeViewProps) {
             </svg>
           </div>
           <h2 className="text-xl font-google-sans text-muted-foreground mb-2">
-            No classes yet
+            {isSignedIn ? "No classes yet" : "Sign in to get started"}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Click the + button to create or join a class
+          <p className="text-sm text-muted-foreground mb-4">
+            {isSignedIn 
+              ? "Click the + button to create or join a class" 
+              : "Sign in with Google to create or join classes"}
           </p>
+          {isSignedIn && (
+            <Button 
+              onClick={handleSeedData} 
+              disabled={seeding}
+              variant="outline"
+              className="mt-2"
+            >
+              {seeding ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating sample data...
+                </>
+              ) : (
+                "Load Sample Classes"
+              )}
+            </Button>
+          )}
         </div>
       )}
     </div>
