@@ -8,11 +8,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface CreateClassModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateClass: (data: { name: string; section: string; subject: string; room: string }) => void;
+  onCreateClass: (data: { name: string; section: string; subject: string; room: string }) => Promise<void> | void;
 }
 
 export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateClassModalProps) {
@@ -20,15 +21,20 @@ export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateCl
   const [section, setSection] = useState("");
   const [subject, setSubject] = useState("");
   const [room, setRoom] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (name.trim()) {
-      onCreateClass({ name, section, subject, room });
-      setName("");
-      setSection("");
-      setSubject("");
-      setRoom("");
-      onOpenChange(false);
+      setLoading(true);
+      try {
+        await onCreateClass({ name, section, subject, room });
+        setName("");
+        setSection("");
+        setSubject("");
+        setRoom("");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -50,6 +56,7 @@ export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateCl
               onChange={(e) => setName(e.target.value)}
               className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
               placeholder=""
+              disabled={loading}
             />
           </div>
           
@@ -63,6 +70,7 @@ export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateCl
               onChange={(e) => setSection(e.target.value)}
               className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
               placeholder=""
+              disabled={loading}
             />
           </div>
           
@@ -76,6 +84,7 @@ export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateCl
               onChange={(e) => setSubject(e.target.value)}
               className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
               placeholder=""
+              disabled={loading}
             />
           </div>
           
@@ -89,20 +98,28 @@ export function CreateClassModal({ open, onOpenChange, onCreateClass }: CreateCl
               onChange={(e) => setRoom(e.target.value)}
               className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 focus-visible:border-primary"
               placeholder=""
+              disabled={loading}
             />
           </div>
         </div>
         
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!name.trim()}
+            disabled={!name.trim() || loading}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Create
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create"
+            )}
           </Button>
         </div>
       </DialogContent>
