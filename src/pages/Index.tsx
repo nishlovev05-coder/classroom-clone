@@ -11,23 +11,6 @@ import { cn } from "@/lib/utils";
 import { useClasses } from "@/hooks/useClasses";
 import { useAuth } from "@/hooks/useAuth";
 
-const mockAssignments = [
-  {
-    id: "1",
-    title: "DEAR STUDENTS, TRY SOLVING ALL THE PROGRAMS",
-    className: "III YEAR(BATCH 2027)",
-    postedDate: "Monday, 16 Sept 2024",
-    type: "question" as const,
-  },
-  {
-    id: "2",
-    title: "take the quiz",
-    className: "III YEAR(BATCH 2027)",
-    postedDate: "Friday, 27 Sept 2024",
-    type: "assignment" as const,
-  },
-];
-
 const COLORS = ["teal", "green", "blue", "purple", "pink", "orange", "brown", "gray"];
 
 const Index = () => {
