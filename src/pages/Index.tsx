@@ -112,7 +112,7 @@ const Index = () => {
         )}
         
         {currentView === "todo" && (
-          <TodoView assignments={mockAssignments} />
+          <TodoView />
         )}
         
         {currentView === "settings" && (
