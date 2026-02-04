@@ -1,7 +1,17 @@
 import { useState } from "react";
-import { Settings, Info, MoreVertical, Send, Link as LinkIcon, UserPlus } from "lucide-react";
+import { Settings, Info, MoreVertical, UserPlus, Plus, ChevronDown, ChevronUp, FileText, ClipboardList } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useClassData } from "@/hooks/useClassData";
+import { CreateAssignmentModal } from "@/components/classroom/CreateAssignmentModal";
+import { AssignmentCard } from "@/components/classroom/AssignmentCard";
+import { Loader2 } from "lucide-react";
 
 interface ClassDetailViewProps {
   classData: {
@@ -10,12 +20,18 @@ interface ClassDetailViewProps {
     section: string;
     teacher: string;
     color: string;
-    classCode: string;
+    classCode?: string | null;
   };
 }
 
 export function ClassDetailView({ classData }: ClassDetailViewProps) {
   const [activeTab, setActiveTab] = useState<"stream" | "classwork" | "people" | "grades">("stream");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createType, setCreateType] = useState<"assignment" | "material">("assignment");
+  const [assignmentsOpen, setAssignmentsOpen] = useState(true);
+  const [materialsOpen, setMaterialsOpen] = useState(true);
+
+  const { assignments, notes, members, loading, createAssignment, createNote } = useClassData(classData.id);
 
   const tabs = [
     { id: "stream", label: "Stream" },
@@ -34,6 +50,26 @@ export function ClassDetailView({ classData }: ClassDetailViewProps) {
     brown: "class-header-brown",
     gray: "class-header-gray",
   };
+
+  const handleCreateAssignment = async (data: {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    pdfUrl?: string;
+  }) => {
+    if (createType === "assignment") {
+      await createAssignment(data);
+    } else {
+      // For materials, we use the notes table
+      await createNote({
+        title: data.title,
+        pdfUrl: data.pdfUrl || "",
+      });
+    }
+  };
+
+  const teachers = members.filter((m) => m.role === "teacher");
+  const students = members.filter((m) => m.role === "student");
 
   return (
     <div className="flex-1">
@@ -87,13 +123,28 @@ export function ClassDetailView({ classData }: ClassDetailViewProps) {
                     <MoreVertical className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </div>
-                <p className="text-2xl font-google-sans text-primary">{classData.classCode}</p>
+                <p className="text-2xl font-google-sans text-primary">
+                  {classData.classCode || "------"}
+                </p>
               </div>
 
               {/* Upcoming Card */}
               <div className="bg-card border border-border rounded-lg p-4">
                 <h3 className="text-sm font-medium text-foreground mb-2">Upcoming</h3>
-                <p className="text-sm text-muted-foreground">Woohoo, no work due soon!</p>
+                {assignments.filter(a => a.dueDate && new Date(a.dueDate) > new Date()).length > 0 ? (
+                  <div className="space-y-2">
+                    {assignments
+                      .filter(a => a.dueDate && new Date(a.dueDate) > new Date())
+                      .slice(0, 3)
+                      .map(a => (
+                        <p key={a.id} className="text-sm text-muted-foreground truncate">
+                          {a.title}
+                        </p>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Woohoo, no work due soon!</p>
+                )}
                 <button className="text-sm text-primary font-medium mt-3 hover:underline">
                   View all
                 </button>
@@ -114,21 +165,43 @@ export function ClassDetailView({ classData }: ClassDetailViewProps) {
                 </div>
               </div>
 
-              {/* Empty State */}
-              <div className="text-center py-12">
-                <div className="w-48 h-48 mx-auto mb-4 opacity-50">
-                  <svg viewBox="0 0 200 200" className="w-full h-full">
-                    <circle cx="100" cy="100" r="80" fill="hsl(var(--muted))" />
-                    <rect x="70" y="60" width="60" height="80" rx="4" fill="hsl(var(--background))" />
-                    <rect x="80" y="75" width="40" height="4" fill="hsl(var(--muted-foreground))" />
-                    <rect x="80" y="85" width="30" height="4" fill="hsl(var(--muted-foreground))" />
-                    <rect x="80" y="95" width="35" height="4" fill="hsl(var(--muted-foreground))" />
-                  </svg>
+              {/* Recent Activity */}
+              {(assignments.length > 0 || notes.length > 0) ? (
+                <div className="space-y-2">
+                  {assignments.slice(0, 5).map((assignment) => (
+                    <div key={assignment.id} className="bg-card border border-border rounded-lg p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                          <ClipboardList className="h-4 w-4 text-primary-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm">
+                            <span className="font-medium">New assignment:</span> {assignment.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Posted {new Date(assignment.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-muted-foreground">
-                  This is where you can talk to your class
-                </p>
-              </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-48 h-48 mx-auto mb-4 opacity-50">
+                    <svg viewBox="0 0 200 200" className="w-full h-full">
+                      <circle cx="100" cy="100" r="80" fill="hsl(var(--muted))" />
+                      <rect x="70" y="60" width="60" height="80" rx="4" fill="hsl(var(--background))" />
+                      <rect x="80" y="75" width="40" height="4" fill="hsl(var(--muted-foreground))" />
+                      <rect x="80" y="85" width="30" height="4" fill="hsl(var(--muted-foreground))" />
+                      <rect x="80" y="95" width="35" height="4" fill="hsl(var(--muted-foreground))" />
+                    </svg>
+                  </div>
+                  <p className="text-muted-foreground">
+                    This is where you can talk to your class
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -137,61 +210,198 @@ export function ClassDetailView({ classData }: ClassDetailViewProps) {
       {/* Classwork View */}
       {activeTab === "classwork" && (
         <div className="max-w-4xl mx-auto p-6">
-          <div className="flex justify-between items-center mb-6">
-            <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors">
-              + Create
-            </button>
-          </div>
-          
-          <div className="text-center py-12">
-            <div className="w-48 h-48 mx-auto mb-4 opacity-50">
-              <svg viewBox="0 0 200 200" className="w-full h-full">
-                <circle cx="100" cy="100" r="80" fill="hsl(var(--muted))" />
-                <rect x="60" y="50" width="80" height="100" rx="4" fill="hsl(var(--background))" />
-                <rect x="70" y="65" width="50" height="4" fill="hsl(var(--primary))" />
-                <rect x="70" y="80" width="60" height="3" fill="hsl(var(--muted-foreground))" />
-                <rect x="70" y="90" width="55" height="3" fill="hsl(var(--muted-foreground))" />
-                <rect x="70" y="110" width="50" height="4" fill="hsl(var(--primary))" />
-                <rect x="70" y="125" width="60" height="3" fill="hsl(var(--muted-foreground))" />
-              </svg>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-            <p className="text-muted-foreground">
-              This is where you'll assign work
-            </p>
-          </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Create
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setCreateType("assignment");
+                        setCreateModalOpen(true);
+                      }}
+                    >
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Assignment
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setCreateType("material");
+                        setCreateModalOpen(true);
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Material
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Assignments Section */}
+              <div className="mb-6">
+                <button
+                  onClick={() => setAssignmentsOpen(!assignmentsOpen)}
+                  className="flex items-center justify-between w-full py-3 border-b border-primary"
+                >
+                  <h2 className="text-lg font-google-sans text-primary">Assignments</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{assignments.length}</span>
+                    {assignmentsOpen ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </button>
+
+                {assignmentsOpen && (
+                  <div className="mt-2 space-y-1">
+                    {assignments.length > 0 ? (
+                      assignments.map((assignment) => (
+                        <AssignmentCard
+                          key={assignment.id}
+                          id={assignment.id}
+                          title={assignment.title}
+                          description={assignment.description}
+                          dueDate={assignment.dueDate}
+                          pdfUrl={assignment.pdfUrl}
+                          createdAt={assignment.createdAt}
+                          type="assignment"
+                        />
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No assignments yet
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Materials Section */}
+              <div className="mb-6">
+                <button
+                  onClick={() => setMaterialsOpen(!materialsOpen)}
+                  className="flex items-center justify-between w-full py-3 border-b border-classroom-purple"
+                >
+                  <h2 className="text-lg font-google-sans text-classroom-purple">Materials</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{notes.length}</span>
+                    {materialsOpen ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </button>
+
+                {materialsOpen && (
+                  <div className="mt-2 space-y-1">
+                    {notes.length > 0 ? (
+                      notes.map((note) => (
+                        <AssignmentCard
+                          key={note.id}
+                          id={note.id}
+                          title={note.title}
+                          pdfUrl={note.pdfUrl}
+                          createdAt={note.createdAt}
+                          type="material"
+                        />
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        No materials yet
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* People View */}
       {activeTab === "people" && (
         <div className="max-w-4xl mx-auto p-6">
-          {/* Teachers Section */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between border-b border-primary pb-2 mb-4">
-              <h2 className="text-3xl font-google-sans text-primary">Teachers</h2>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-            <div className="flex items-center gap-4 p-2">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-classroom-purple text-primary-foreground">
-                  {classData.teacher.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-foreground">{classData.teacher}</span>
-            </div>
-          </div>
+          ) : (
+            <>
+              {/* Teachers Section */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between border-b border-primary pb-2 mb-4">
+                  <h2 className="text-3xl font-google-sans text-primary">Teachers</h2>
+                </div>
+                {teachers.length > 0 ? (
+                  teachers.map((teacher) => (
+                    <div key={teacher.id} className="flex items-center gap-4 p-2">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-classroom-purple text-primary-foreground">
+                          T
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm text-foreground">Teacher</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="flex items-center gap-4 p-2">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-classroom-purple text-primary-foreground">
+                        {classData.teacher.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm text-foreground">{classData.teacher}</span>
+                  </div>
+                )}
+              </div>
 
-          {/* Classmates Section */}
-          <div>
-            <div className="flex items-center justify-between border-b border-primary pb-2 mb-4">
-              <h2 className="text-3xl font-google-sans text-primary">Classmates</h2>
-              <button className="gc-icon-btn">
-                <UserPlus className="h-5 w-5 text-primary" />
-              </button>
-            </div>
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No classmates yet</p>
-            </div>
-          </div>
+              {/* Students Section */}
+              <div>
+                <div className="flex items-center justify-between border-b border-primary pb-2 mb-4">
+                  <h2 className="text-3xl font-google-sans text-primary">
+                    Students
+                    {students.length > 0 && (
+                      <span className="text-lg font-normal text-muted-foreground ml-2">
+                        ({students.length})
+                      </span>
+                    )}
+                  </h2>
+                  <button className="gc-icon-btn">
+                    <UserPlus className="h-5 w-5 text-primary" />
+                  </button>
+                </div>
+                {students.length > 0 ? (
+                  students.map((student) => (
+                    <div key={student.id} className="flex items-center gap-4 p-2 hover:bg-muted/50 rounded-lg">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-classroom-teal text-primary-foreground">
+                          S
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm text-foreground">Student</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No students yet</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -215,6 +425,14 @@ export function ClassDetailView({ classData }: ClassDetailViewProps) {
           </div>
         </div>
       )}
+
+      {/* Create Assignment Modal */}
+      <CreateAssignmentModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onCreateAssignment={handleCreateAssignment}
+        type={createType}
+      />
     </div>
   );
 }
